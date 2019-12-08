@@ -14,6 +14,15 @@ const bool    kMatrixSerpentineLayout = true;
 int stripCount = 5;
 float currSpeed = .05;
 int totalDrips = 10;
+int leds_done = 0;
+int offset = 0;
+
+static const uint32_t strip1Array[] PROGMEM = { 0,   1,   2,   3,   4,   5,   6,   7,   8,   9,  10,  11,  12,  13,  14,  15,  16,  17,  18,  19,  20,  21,  22,  23,  24,  25,  26,  27,  28,  29,  30,  31,  32,  33,  34,  35,  36,  37,  38,  39,  40,  41,  42,  43,  44,  45,  46,  47,  48,  49,  50,  51,  52,  53,  54,  55,  56,  57,  58,  59 };
+static const uint32_t strip2Array[] PROGMEM = { 60,  61,  62,  63,  64,  65,  66,  67,  68,  69,  70,  71,  72,  73,  74,  75,  76,  77,  78,  79,  80,  81,  82,  83,  84,  85,  86,  87,  88,  89,  90,  91,  92,  93,  94,  95,  96,  97,  98,  99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119 };
+static const uint32_t strip3Array[] PROGMEM = { 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131, 132, 133, 134, 135, 136, 137, 138, 139, 140, 141, 142, 143, 144, 145, 146, 147, 148, 149, 150, 151, 152, 153, 154, 155, 156, 157, 158, 159, 160, 161, 162, 163, 164, 165, 166, 167, 168, 169, 170, 171, 172, 173, 174, 175, 176, 177, 178, 179 };
+static const uint32_t strip4Array[] PROGMEM = { 180, 181, 182, 183, 184, 185, 186, 187, 188, 189, 190, 191, 192, 193, 194, 195, 196, 197, 198, 199, 200, 201, 202, 203, 204, 205, 206, 207, 208, 209, 210, 211, 212, 213, 214, 215, 216, 217, 218, 219, 220, 221, 222, 223, 224, 225, 226, 227, 228, 229, 230, 231, 232, 233, 234, 235, 236, 237, 238, 239 };
+static const uint32_t strip5Array[] PROGMEM = { 240, 241, 242, 243, 244, 245, 246, 247, 248, 249, 250, 251, 252, 253, 254, 255, 256, 257, 258, 259, 260, 261, 262, 263, 264, 265, 266, 267, 268, 269, 270, 271, 272, 273, 274, 275, 276, 277, 278, 279, 280, 281, 282, 283, 284, 285, 286, 287, 288, 289, 290, 291, 292, 293, 294, 295, 296, 297, 298, 299 };
+
 
 uint16_t serpentineArray[] = {
   0,  60, 120, 180, 240,
@@ -123,7 +132,7 @@ class Drips {
 
 
   public:
-    Drips(float yPos, uint8_t howOld, uint8_t whichStrip) {
+    Drips(float yPos, uint16_t howOld, uint8_t whichStrip) {
       stringPos = yPos;
       age = howOld;
       stripNumber = whichStrip;
@@ -132,16 +141,16 @@ class Drips {
     void updateDrip() {
       //if the current position is less than the last pixel on the strip, increase the position by
       //base speed multiplied by how old it is. Set that pixel's new color and increase it's age
-      if (round(stringPos) < (NUM_LEDS_PER_STRIP * (stripNumber + 1))) {
+      if (round(stringPos) < (NUM_LEDS_PER_STRIP * (stripNumber + 1)) && round(stringPos) < NUM_LEDS - 1) {
         float newPos = stringPos + (currSpeed * age);
         stringPos = newPos;
-        leds[round(newPos)] = CHSV(255, 0, random(128, 255));
-        if (age<30) age++;
+        leds[round(stringPos)] = CHSV(255, 0, random(128, 255));
+        Serial.println((String)"stringPos " + newPos);
+        if (age < 30) age++;
       } else {
         //otherwise run function to choose a new strip and reset it back to 0 position
         resetDrip();
       }
-
     }
 
     //Choose a new strip, set its position to the top of said strip and reset its age
@@ -183,6 +192,7 @@ void setup() {
   for (int i = 0; i < totalDrips; i++) {
     drip[i].randomDrip();
   }
+  Serial.begin(9600);
   FastLED.addLeds<WS2812, 21, GRB>(leds, 0, NUM_LEDS_PER_STRIP);
   FastLED.addLeds<WS2812, 19, GRB>(leds, NUM_LEDS_PER_STRIP, NUM_LEDS_PER_STRIP);
   FastLED.addLeds<WS2812, 17, GRB>(leds, 2 * NUM_LEDS_PER_STRIP, NUM_LEDS_PER_STRIP);
@@ -240,8 +250,7 @@ void fillnoise8() {
   y -= speed / 16;
 }
 
-void mapNoiseToLEDsUsingPalette()
-{
+void mapNoiseToLEDsUsingPalette() {
   static uint8_t ihue = 0;
 
   for (int i = 0; i < kMatrixWidth; i++) {
@@ -278,7 +287,9 @@ void mapNoiseToLEDsUsingPalette()
 typedef void (*SimplePatternList[])();
 SimplePatternList gPatterns = {
   &dripPattern,
-  &runNoise
+  &showCandyCane,
+  &runNoise,
+  &rainbowFalls
 };
 
 
@@ -286,19 +297,18 @@ void loop() {
   currentMillis = millis();
   /*EVERY_N_MILLISECONDS( 20 ) {
     gHue++;
-  }*/
+    }*/
 
   gPatterns[gCurrentPatternNumber]();
   //dripPattern();
-  
-  /*EVERY_N_SECONDS( 12 ) {
+
+  EVERY_N_SECONDS( 12 ) {
     nextPattern();  // change patterns periodically
-  }*/
+  }
 
 }
 
-void nextPattern()
-{
+void nextPattern() {
   // add one to the current pattern number, and wrap around at the end
   gCurrentPatternNumber = (gCurrentPatternNumber + 1) % ARRAY_SIZE( gPatterns);
 }
@@ -307,7 +317,7 @@ void runNoise() {
   // Periodically choose a new palette, speed, and scale
   ChangePaletteAndSettingsPeriodically();
 
-  uint8_t maxChanges = 8;
+  uint8_t maxChanges = 16;
   nblendPaletteTowardPalette( currentPalette, targetPalette, maxChanges);
 
   // generate noise data
@@ -337,8 +347,7 @@ void runNoise() {
 #define PALETTE_SPEED 3
 #define PALETTE_SCALE 100
 
-void ChangePaletteAndSettingsPeriodically()
-{
+void ChangePaletteAndSettingsPeriodically() {
   uint8_t secondHand = ((millis() / 1000) / HOLD_PALETTES_X_TIMES_AS_LONG) % 60;
   static uint8_t lastSecond = 99;
 
@@ -416,8 +425,7 @@ void twinkle() {
 //
 // Mark's xy coordinate mapping code.  See the XYMatrix for more information on it.
 //
-uint16_t XY( uint8_t x, uint8_t y)
-{
+uint16_t XY( uint8_t x, uint8_t y) {
   uint16_t i;
   if ( kMatrixSerpentineLayout == false) {
     i = (y * kMatrixWidth) + x;
@@ -435,15 +443,6 @@ uint16_t XY( uint8_t x, uint8_t y)
   return i;
 }
 
-void sinelon()
-{
-  // a colored dot sweeping back and forth, with fading trails
-  fadeToBlackBy( leds, NUM_LEDS, 15);
-  int pos = beatsin16( 30, 1, NUM_LEDS - 1 );
-  leds[serpentineArray[pos]] += CHSV( 255, 255, 192);
-  FastLED.show();
-}
-
 void showDrips() {
   fadeToBlackBy(leds, NUM_LEDS, 64);
   for (int i = 0; i < totalDrips; i++) {
@@ -457,10 +456,65 @@ void dripPattern() {
     showDrips();
   }
 }
-// Gradient palette "Blinds_gp", originally from
-// http://soliton.vm.bytemark.co.uk/pub/cpt-city/ggr/tn/Blinds.png.index.html
-// converted for FastLED with gammas (2.6, 2.2, 2.5)
-// Size: 420 bytes of program space.
+
+void rainbowFalls() {
+
+  uint32_t pos;
+  for (uint8_t j = 0; j < NUM_LEDS_PER_STRIP; j++) {
+    for (uint8_t i = 0; i <= stripCount; i++) {
+      //pos = j*i;
+
+      switch (i) {
+        case 0:
+          pos = strip1Array[j];
+          break;
+        case 1:
+          pos = strip2Array[j];
+          break;
+        case 2:
+          pos = strip3Array[j];
+          break;
+        case 3:
+          pos = strip4Array[j];
+          break;
+        case 4:
+          pos = strip5Array[j];
+          break;
+        default:
+          break;
+      }
+
+      leds[pos] = CHSV(random8(255), 255, 255);
+      twinkle();
+      FastLED.show();
+      delay (10);
+      fadeToBlackBy( leds, NUM_LEDS, 1);
+    }
+  }
+
+}
+
+void showCandyCane() {
+  candyStripes(10, CRGB::Red, CRGB::White, 85);
+}
+
+void candyStripes(uint8_t width, CRGB color1, CRGB color2, uint8_t speed ) {
+ 
+  EVERY_N_MILLISECONDS(speed) {
+    for (int i = 0; i < NUM_LEDS; i++) {
+      if ( (i + offset) % (2 * width) < width + 1 ) {
+        leds[i] = color2;
+      } else {
+        leds[i] = color1;
+      }
+    }
+    twinkle();
+    FastLED.show();
+    offset--;
+    if (offset <= 0) offset = NUM_LEDS;
+  }
+}
+
 
 DEFINE_GRADIENT_PALETTE( blinds_gp ) {
   0,   0,  0,  0,
@@ -590,7 +644,6 @@ DEFINE_GRADIENT_PALETTE( candycane_gp) {
   255 , 255, 0, 0  //red
 };
 
-
 DEFINE_GRADIENT_PALETTE( silvergold_gp) {
   46, 191, 201, 224,
   127, 255, 236, 133,
@@ -604,8 +657,6 @@ DEFINE_GRADIENT_PALETTE( pit ) {
   192, 255, 130,   3 ,  //orange
   255,   3,   3,   3
 };
-
-
 
 DEFINE_GRADIENT_PALETTE( rainbow_gp ) {
   0,  88,  0,  0,
